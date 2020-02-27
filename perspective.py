@@ -2,12 +2,13 @@ import cv2
 import numpy as np
 import pickle
 
+# chessboard size
 chess_w, chess_h = 4, 7
 
-# Store the calibration data
+# Store the homography data
 def store_data(data):
 
-	f = open("calibration.txt", "wb")
+	f = open("perspective.pickle", "wb")
 	pickle.dump(data, f)
 	f.close()
 
@@ -15,30 +16,39 @@ def store_data(data):
 #Calculate and return homography matrix
 def CalibratePrespective():
 
-	print("Calibrating Camera...")
+	print("Calculating Homogrphy Matrix...")
 
 	ret, frame = cam.read()
-	ref = cv2.imread('calb.jpg')
 
+	# load the reference image
+	ref = cv2.imread('img/reference.jpg')
+
+	# find the chessboard corners
 	ret1, corners1 = cv2.findChessboardCorners(ref, (chess_h,chess_w), None)
 	ret2, corners2 = cv2.findChessboardCorners(frame, (chess_h,chess_w), None)
 
+	# check if corners exist
 	if ret2 == True:
+
+		# Calculate homogrphy transform matrix
 		h_mat, status = cv2.findHomography(corners2, corners1)
-		ref = cv2.drawChessboardCorners(ref, (7,4), corners1,ret1)
-		frame = cv2.drawChessboardCorners(frame, (7,4), corners2,ret2)
-		pt1, pt2, pt3, pt4 = repr(corners2[0]), tuple(corners2[chess_h-1]), tuple(corners2[chess_h*chess_w-1]), tuple(corners2[chess_h*chess_w-chess_h-1])
-		print(pt1, pt2, pt3, pt4)
-		# cv2.line(frame, pt1[0], pt2[0], (0, 0, 255), 2)
-		# cv2.line(frame, tuple(corners2[chess_h-1]), tuple(corners2[chess_h*chess_w-1]), (0, 0, 255), 2)
-		# cv2.line(frame, tuple(corners2[chess_h*chess_w-1]), tuple(corners2[chess_h*chess_w-chess_h-1]), (0, 0, 255), 2)
-		# cv2.line(frame, tuple(corners2[chess_h*chess_w-chess_h-1]), tuple(corners2[0]), (0, 0, 255), 2)
+
+		frame = cv2.drawChessboardCorners(frame, (chess_h,chess_w), corners2,ret2)
+
 		cv2.imshow('result', frame)
 		cv2.waitKey(0)
+
+		# apply the perspective correction on the frame
+		transformed_frame = cv2.warpPerspective(frame, h_mat, (frame.shape[1], frame.shape[0]))
+
+		cv2.imshow('result', transformed_frame)
+		cv2.waitKey(0)
+
 		cv2.destroyWindow('result')
-		print(" Camera Calibrated ", h_mat)
+		print(" Calculated Matrix ", h_mat)
+
 		store_data(h_mat)
-		return h_mat
+
 	else:
 		raise Exception("Chessboard not found")
 
@@ -49,44 +59,30 @@ def CalibratePrespective():
 
 cam = cv2.VideoCapture(0)
 
-#load calibration data
-f = open("calibration.txt", "rb")
-try:
-	h = pickle.load(f)
-except:
-	input("Calibration Required, Press enter when ready")
-	h = CalibratePrespective()
-f.close()
-
-
 # Main Loop
 while(True):
 
 	ret, frame = cam.read()
-	# Apply Prespective Transform
 
-	cal_frame = cv2.warpPerspective(frame, h, (frame.shape[1], frame.shape[0]))
+	# cal_frame = cv2.warpPerspective(frame, h, (frame.shape[1], frame.shape[0]))
+
+	k = cv2.waitKey(1)
 
 	# Re-Calibration
-	if cv2.waitKey(1) & 0xFF == ord('c'):
+	if k == ord('c'):
 		# try:
-		# 	h_old = h
-		# 	h = CalibratePrespective()
+		# 	CalibratePrespective()
 		# except:
-		# 	h = h_old
-		# 	print("Calibration Failed")
+		# 	print("Chessboard not found. Try Again : Press c")
 		# 	continue
-		h_old = h
-		h = CalibratePrespective()
+		CalibratePrespective()
 
-	if cv2.waitKey(1) & 0xFF == ord('q'):
+	if k == ord('q'):
 		break
-
-	#Processing
 
 
 	# Display Window
-	cv2.imshow('frame',cal_frame)
+	cv2.imshow('frame',frame)
 
 
 
